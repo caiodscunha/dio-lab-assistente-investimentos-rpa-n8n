@@ -1,0 +1,274 @@
+{
+  "name": "Dio Project",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "clientes",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -240,
+        0
+      ],
+      "id": "a91c5386-fe85-485b-a4af-557fc71d66c4",
+      "name": "Webhook",
+      "webhookId": "db94b2ba-edf0-4ad7-ac32-19b305e736b3"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1296,
+        -112
+      ],
+      "id": "3712bff1-9941-483c-a11a-bd2175932eb0",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "url": "https://raw.githubusercontent.com/caiodscunha/dio-lab-assistente-investimentos-rpa-n8n/refs/heads/main/docs/data.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        64,
+        0
+      ],
+      "id": "bfb842ae-c5f2-47eb-83d0-a834f5f00086",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega o CSV como texto vindo do HTTP Request\nconst csvRaw = $json.data ?? $json.body ?? $json;\nconst text = (typeof csvRaw === \"string\" ? csvRaw : JSON.stringify(csvRaw))\n  .replace(/^\\uFEFF/, \"\");\n\n// Separa linhas e remove linhas vazias\nconst lines = text.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean);\nconst headers = lines[0].split(\";\").map(h => h.trim());\n\n// Converte cada linha em objeto\nconst investimentos = lines.slice(1).map(line => {\n  const cols = line.split(\";\").map(c => c.trim());\n  const obj = {};\n  headers.forEach((h, i) => obj[h] = cols[i] ?? \"\");\n\n  // normaliza número para número\n  obj.minimo = Number(String(obj.minimo).replace(/[^\\d]/g, \"\")) || 0;\n\n  return obj;\n});\n\nreturn { json: { investimentos } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "ad10dc27-958d-4a1c-a45a-a5bc854bb382",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        464,
+        -240
+      ],
+      "id": "50765552-5f93-48bf-9050-f591cfa51d6f",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tabela de produtos de investimento por perfil\nconst produtosInvestimento = [\n  { perfil: \"Conservador\", produto: \"Poupança\", minimo: 100, rentabilidade: \"6.2%\" },\n  { perfil: \"Conservador\", produto: \"CDB Liquidez Diária\", minimo: 1000, rentabilidade: \"12.5%\" },\n  { perfil: \"Conservador\", produto: \"Tesouro Selic\", minimo: 500, rentabilidade: \"11.0%\" },\n  { perfil: \"Moderado\", produto: \"CDB Prefixado\", minimo: 1000, rentabilidade: \"14.0%\" },\n  { perfil: \"Moderado\", produto: \"Fundo Multimercado\", minimo: 5000, rentabilidade: \"16.0%\" },\n  { perfil: \"Moderado\", produto: \"Tesouro IPCA+\", minimo: 1000, rentabilidade: \"IPCA+6.0%\" },\n  { perfil: \"Arrojado\", produto: \"Ações ETF\", minimo: 500, rentabilidade: \"Variável\" },\n  { perfil: \"Arrojado\", produto: \"Fundo de Ações\", minimo: 10000, rentabilidade: \"Variável\" },\n  { perfil: \"Arrojado\", produto: \"Criptomoedas\", minimo: 100, rentabilidade: \"Variável\" }\n];\n\n// Função para converter \"R$ 12.500,00\" para número (12500)\nfunction converterSaldoParaNumero(saldoTexto) {\n  if (typeof saldoTexto === 'number') return saldoTexto;\n  if (!saldoTexto) return 0;\n\n  const limpo = String(saldoTexto)\n    .replace(/[R$\\s.]/g, '')\n    .replace(',', '.');\n\n  return parseFloat(limpo) || 0;\n}\n\n// Processa um único cliente\nfunction processarCliente(cliente) {\n  const nome = cliente.nome || cliente.Nome || 'Cliente';\n  const email = cliente.email || cliente.Email || '';\n  const perfil = cliente.perfil || cliente.Perfil || 'Conservador';\n  const saldoTexto = cliente.saldo || cliente.Saldo || 'R$ 0,00';\n  const saldoNum = converterSaldoParaNumero(saldoTexto);\n\n  const opcoesPerfil = produtosInvestimento.filter(\n    inv => inv.perfil === perfil\n  );\n\n  let recomendacao = opcoesPerfil.find(\n    inv => saldoNum >= inv.minimo\n  );\n\n  let motivo = \"saldo_ok\";\n\n  if (!recomendacao && opcoesPerfil.length > 0) {\n    recomendacao = opcoesPerfil.reduce(\n      (prev, curr) => prev.minimo < curr.minimo ? prev : curr\n    );\n    motivo = \"saldo_insuficiente\";\n  }\n\n  const prodNome = recomendacao ? recomendacao.produto : \"Nenhum\";\n  const minVal = recomendacao ? recomendacao.minimo : 0;\n  const rent = recomendacao ? recomendacao.rentabilidade : \"N/A\";\n\n  const minFormatado = minVal.toLocaleString(\n    'pt-BR',\n    { minimumFractionDigits: 2 }\n  );\n\n  const mensagens = [\n    `Olá ${nome}! Pelo seu perfil (${perfil}), uma boa opção é **${prodNome}** (mínimo R$ ${minFormatado}). Com seu saldo atual (${saldoTexto}), você já consegue investir. Rentabilidade: ${rent}.`,\n    `Oi ${nome}! Recomendação para perfil ${perfil}: **${prodNome}** (mínimo R$ ${minFormatado}). Seu saldo (${saldoTexto}) já atende o mínimo. Rentabilidade: ${rent}.`,\n    `${nome}, indo direto ao ponto: para o perfil ${perfil}, **${prodNome}** (mínimo R$ ${minFormatado}). Você tem ${saldoTexto}, então dá pra aplicar. Rentabilidade: ${rent}.`\n  ];\n\n  return {\n    nome: nome,\n    email: email,\n    perfil: perfil,\n    saldo_texto: saldoTexto,\n    saldo_num: saldoNum,\n    Recomendacao: {\n      perfil: perfil,\n      produto: prodNome,\n      minimo: minVal,\n      rentabilidade: rent\n    },\n    motivo: motivo,\n    mensagens: mensagens,\n    mensagem_escolhida: mensagens[0]\n  };\n}\n\n// Captura e extração automática da lista de clientes\nconst itensEntrada = $input.all();\nlet listaClientes = [];\n\nfor (const item of itensEntrada) {\n  const json = item.json;\n\n  // Os dados podem vir dentro de json.body\n  const dados = json.body || json;\n\n  if (Array.isArray(dados)) {\n    listaClientes.push(...dados);\n  } else if (Array.isArray(dados.clientes)) {\n    listaClientes.push(...dados.clientes);\n  } else if (Array.isArray(dados.data)) {\n    listaClientes.push(...dados.data);\n  } else if (typeof dados === 'object') {\n    listaClientes.push(dados);\n  }\n}\n\n// Retorna cada cliente como um item separado no n8n\nreturn listaClientes.map(cliente => ({\n  json: processarCliente(cliente)\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        -32
+      ],
+      "id": "3ddf5ab5-9047-4a13-9bd9-a56dbe19c43d",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "o4-mini",
+          "mode": "list",
+          "cachedResultName": "O4-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Escreva um e-mail curto em pt-BR para o cliente abaixo, sem prometer ganhos e sem garantias.\n\nCliente:\n\nNome: {{ $json.nome }}\nPerfil: {{ $json.perfil }} \nSaldo: {{ $json.saldo_texto }}\n\nRecomendação: \nProduto:  {{ $json.Recomendacao.produto }}\nLiquidez Diária Mínimo: {{ $json.Recomendacao.minimo }}\nRentabilidade:  {{ $json.Recomendacao.rentabilidade }}\nMotivo: {{ $json.motivo }}\n\nRetorne APENAS JSON com:\n\n{ \"subject\": \"...\", \"textbody\": \"...\", \"htmlbody\": \"...\" }"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        800,
+        -272
+      ],
+      "id": "45ba15ec-2aea-4b49-ae70-2e182e4301d4",
+      "name": "Message a model"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.motivo }}",
+        "message": "={{ $json.mensagem_escolhida }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1056,
+        -112
+      ],
+      "id": "fa7ed6c7-4e74-4ef7-a420-28cdeb4feae4",
+      "name": "Send a message",
+      "webhookId": "a297b616-816c-4e35-8b46-55750cedadd5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fa0a4228-b619-42ad-b3ea-fcd0069d569b",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        816,
+        -32
+      ],
+      "id": "ac283c5b-2cde-4318-84bf-dc6eb3809351",
+      "name": "If"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "73de36e4-939b-40ca-aff5-319700b1e9e3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "662b24c10966e5a2c9e05b52e22948237b0e8345e215dae0eadbd54a57d5fcd5"
+  },
+  "id": "FfRfya3b6iKeomjf",
+  "tags": []
+}
