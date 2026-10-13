@@ -29,8 +29,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1296,
-        -112
+        1024,
+        -96
       ],
       "id": "3712bff1-9941-483c-a11a-bd2175932eb0",
       "name": "Respond to Webhook"
@@ -127,8 +127,8 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        1056,
-        -112
+        1152,
+        -272
       ],
       "id": "fa7ed6c7-4e74-4ef7-a420-28cdeb4feae4",
       "name": "Send a message",
@@ -239,7 +239,7 @@
       "main": [
         [
           {
-            "node": "Send a message",
+            "node": "Respond to Webhook",
             "type": "main",
             "index": 0
           }
@@ -248,13 +248,7 @@
     },
     "Send a message": {
       "main": [
-        [
-          {
-            "node": "Respond to Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     }
   },
@@ -264,7 +258,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "73de36e4-939b-40ca-aff5-319700b1e9e3",
+  "versionId": "9db8c9d8-c02c-4de7-a954-f61bd934fa05",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "662b24c10966e5a2c9e05b52e22948237b0e8345e215dae0eadbd54a57d5fcd5"
